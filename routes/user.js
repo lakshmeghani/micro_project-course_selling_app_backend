@@ -10,26 +10,6 @@ const JWT_SECRET = process.env.JWT_SECRET
 
 router.use(express.json())
 
-// function auth(req, res, next) {
-//     let token = req.headers.authorization
-//
-//     //verifying the token
-//     try {
-//         let verifiedToken = jwt.verify(token, JWT_SECRET)
-//         req.authentication = {
-//             "result": true,
-//             "data": verifiedToken,
-//         } // storing the verified data in the request object
-//         next()
-//     } catch (err) {
-//         res.json({
-//             "error": "jsonwebtoken - received token from user",
-//             "hint": "token verification failed",
-//             "message": err,
-//         })
-//     } // token verification handled
-// }
-
 // Function for validating user input with ZOD
 function zodValidation(dataObject) {
     const UserZod = z.object({
@@ -59,12 +39,12 @@ function bcryptHashing(password) {
 
 // Function for assigning web tokens for authentication sessions
 // - eliminateing re-signups - reducing database-calls
-function genToken(dataObject) {
-    jwt.sign({
-        "firstName": dataObject.firstName,
-        "lastName": dataObject.lastName,
-        "isCourseMaker": dataObject.isCourseMaker
+function genToken({ userId, isCourseMaker }) {
+    let token = jwt.sign({
+        userId,
+        isCourseMaker
     }, JWT_SECRET) // token generated
+    console.log(token)
 }
 // --------------------------------------------------------------------------------------------------------------------
 // User-Related routes
@@ -115,10 +95,13 @@ router.post("/signup", (req, res) => {
     })
 
     newUser.save()
-        .then(() => {
+        .then((data) => {
             // Generating new jsonwebtoken
             try {
-                genToken(verifiedData) // token generated
+                genToken({
+                    userId: data._id,
+                    isCourseMaker: verifiedData.isCourseMaker
+                }) // token generated
             } catch (err) {
                 res.status(403).json({
                     "error": "JSONWEBTOKEN",
@@ -165,8 +148,10 @@ router.post("/login", (req, res) => {
 
                 // generating a new web-token
                 try {
-                    genToken(dbUser)
-                    // not verifiedData here as verified data has firstName and lastName = "not required"
+                    genToken({
+                        userId: dbUser[0]._id,
+                        isCourseMaker: dbUser[0].isCourseMaker
+                    }) // token generated
                 } catch (err) {
                     res.status(403).json({
                         "error": "JSONWEBTOKEN",
@@ -198,7 +183,41 @@ router.post("/login", (req, res) => {
 })
 
 router.get("/profile", (req, res) => {
+    let token = req.headers.authorization
+    let verifiedToken;
 
+    //verifying the token
+    try {
+        verifiedToken = jwt.verify(token, JWT_SECRET)
+    } catch (err) {
+        res.status(403).json({
+            "error": "jsonwebtoken - received token from user",
+            "hint": "token verification failed",
+            "message": err,
+        })
+    } // token verification handled
+
+    async function findUser() {
+        let userDb = await UserModel.findById(verifiedToken.userId)
+        return userDb
+    }
+
+    async function showData() {
+        try {
+            let data = await findUser() // comes as an array
+            res.json({
+                "success": "data retreived from database",
+                "data": data,
+            })
+        } catch (err) {
+            res.status(403).json({
+                "error": "database - user data",
+                "hint": "failed to retrieve user data",
+                "message": err,
+            })
+        }
+    }
+    showData() // showing data
 })
 
 module.exports = router
