@@ -16,7 +16,7 @@ const Course = new Schema({
     description: String,
     price: Number,
     imageUrl: String,
-    courseCreator: ObjectId
+    courseMaker: ObjectId
 })
 
 const UserModel = mongoose.model("users", User)
