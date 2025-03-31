@@ -64,7 +64,7 @@ router.post("/signup", (req, res) => {
     try {
         verifiedData = zodValidation(dataObject)
     } catch (err) {
-        res.status(403).json({
+        return res.status(403).json({
             "error": "ZOD",
             "hint": "Please enter correct type of data",
             "message": err
@@ -77,7 +77,7 @@ router.post("/signup", (req, res) => {
     try {
         hashedPassword = bcryptHashing(verifiedData.password)
     } catch (err) {
-        res.json({
+        return res.json({
             "error": "BCRYPT",
             "hint": "error in salting or hashing algorithm for computing password",
             "message": err,
@@ -130,7 +130,7 @@ router.post("/login", (req, res) => {
     try {
         verifiedData = zodValidation(dataObject)
     } catch (err) {
-        res.status(403).json({
+        return res.status(403).json({
             "error": "ZOD",
             "hint": "enter proper credentials",
             "message": err,
