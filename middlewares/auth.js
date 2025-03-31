@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken')
-require('dotenv').config
+require('dotenv').config()
 let JWT_SECRET = process.env.JWT_SECRET
 
 function userAuth(req, res, next) {

@@ -32,11 +32,6 @@ router.get('/all', async (req, res) => {
     })
 })
 
-// view all purchased courses
-router.get('/purchases', userAuth, (req, res) => {
-
-})
-
 // if registered coursemaker, create a course
 router.post('/create', courseMakerAuth, async (req, res) => {
     // extracting course details

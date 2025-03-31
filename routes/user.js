@@ -1,6 +1,7 @@
 const express = require("express")
-const { UserModel } = require('../db')
+const { UserModel, CourseModel } = require('../db')
 const jwt = require('jsonwebtoken')
+const { userAuth } = require('../middlewares/auth')
 const bcrypt = require('bcrypt')
 const { z } = require('zod')
 require('dotenv').config()
@@ -182,42 +183,116 @@ router.post("/login", (req, res) => {
     verifyCredentials()
 })
 
-router.get("/profile", (req, res) => {
-    let token = req.headers.authorization
-    let verifiedToken;
+router.get("/profile", userAuth, async (req, res) => {
 
-    //verifying the token
+    let userId = req.verifiedUserData.userId
+
     try {
-        verifiedToken = jwt.verify(token, JWT_SECRET)
+        let userDb = await UserModel.findById(userId) // returns only one object as "findById" 
+        res.json({
+            "success": "data retreived from database",
+            "data": userDb,
+        })
     } catch (err) {
         res.status(403).json({
-            "error": "jsonwebtoken - received token from user",
-            "hint": "token verification failed",
+            "error": "database - user data",
+            "hint": "failed to retrieve user data",
             "message": err,
         })
-    } // token verification handled
+    }
+})
 
-    async function findUser() {
-        let userDb = await UserModel.findById(verifiedToken.userId)
-        return userDb
+// --------------------------------------------------------------------------------------------------------------------
+// All user-course related routes, meant for user
+router.post("/purchase-course", userAuth, async (req, res) => {
+    let dataObject = req.body
+    dataObject.userId = req.verifiedUserData.userId
+
+    // zod validation of user input
+    let UserPurchaseZod = z.object({
+        userId: z.string(),
+        courseId: z.string(),
+    })
+
+    let verifiedPurchaseData;
+    try {
+        verifiedPurchaseData = UserPurchaseZod.parse(dataObject)
+    } catch (err) {
+        return res.status(403).json({
+            "error": "ZOD",
+            "hint": "user data type invalid",
+            "message": err,
+        })
     }
 
-    async function showData() {
-        try {
-            let data = await findUser() // comes as an array
-            res.json({
-                "success": "data retreived from database",
-                "data": data,
-            })
-        } catch (err) {
-            res.status(403).json({
-                "error": "database - user data",
-                "hint": "failed to retrieve user data",
-                "message": err,
-            })
+    // finding a course whether it exists or not as an edge case 
+    let verifiedCourseId;
+    try {
+        verifiedCourseId = await CourseModel.findById(verifiedPurchaseData.courseId)
+        if (verifiedCourseId == null) { throw new Error("either course doesn't exsit or the Object-Id is wrong") }
+    } catch (err) {
+        return res.status(403).json({
+            "error": "database fetch-call",
+            "hint": "course may no longer exist",
+            "message": err,
+        })
+    }
+
+    // finding the user's database object and adding it to the purchases list
+    try {
+        await UserModel.findOneAndUpdate(
+            { _id: verifiedPurchaseData.userId },
+            { $push: { purchases: verifiedCourseId } },
+        )
+        res.json({
+            "success": "pushed course-object_id to user-object_id in database",
+            "message": "database updated",
+        })
+    } catch (err) {
+        res.status(403).json({
+            "error": "saving purchase to user in database",
+            "hint": "purchase db-write issue",
+            "message": err,
+        })
+    }
+})
+
+// view all purchased courses
+router.get('/purchases', userAuth, async (req, res) => {
+    let userId = req.verifiedUserData.userId
+
+    // retreiving purchases from database
+    let allPurchasesObj
+    try {
+        let userDb = await UserModel.findById(userId)
+        allPurchasesObj = userDb.purchases
+    } catch (err) {
+        return res.status(403).json({
+            "error": "user-database fetch-call",
+            "hint": "unable to get user-purchases",
+            "message": err,
+        })
+    }
+
+    // retrieving course-objects from database
+    try {
+        let allPurchasedCourses = []
+        for (const courseObj of allPurchasesObj) {
+            allPurchasedCourses.push(
+                await CourseModel.findById(courseObj)
+            )
         }
+        res.json({
+            "success": "found all purchased courses and course-details",
+            "purchased courses": allPurchasedCourses,
+        })
+    } catch (err) {
+        res.status(403).json({
+            "error": "not able to find courses",
+            "hint": "database not able to retrieve courses",
+            "message": err,
+        })
     }
-    showData() // showing data
 })
 
 module.exports = router
