@@ -151,4 +151,25 @@ router.put('/course-content', courseMakerAuth, async (req, res) => {
     }
 })
 
+router.get("/myCourses", courseMakerAuth, async (req, res) => {
+
+    // database fetch-call 
+    try {
+        let myCourses = await CourseModel.find({
+            "courseMaker": req.verifiedUserData.userId,
+        })
+        res.json({
+            "success": "displaying all courses created by you...",
+            "courses": myCourses,
+        })
+    } catch (err) {
+        res.status(403).json({
+            "error": "database fetch-call",
+            "hint": "finding courses in database",
+            "message": err,
+        })
+    }
+
+})
+
 module.exports = router
