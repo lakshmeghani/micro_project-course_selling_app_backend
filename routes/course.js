@@ -9,10 +9,10 @@ router.use(express.json())
 // ZOD - user data validation
 function zodValidation(dataObject) {
     const CourseZod = z.object({
-        title: z.string(),
-        description: z.string(),
-        price: z.number(),
-        imageUrl: z.string(),
+        title: z.union([z.string(), z.undefined()]),
+        description: z.union([z.string(), z.undefined()]),
+        price: z.union([z.number(), z.undefined()]),
+        imageUrl: z.union([z.string(), z.undefined()]),
         courseMaker: z.string()
     })
 
@@ -79,13 +79,76 @@ router.post('/create', courseMakerAuth, async (req, res) => {
 })
 
 // if coursemaker, delete a course previously made by you
-router.delete('/delete', courseMakerAuth, (req, res) => {
+router.delete('/delete', courseMakerAuth, async (req, res) => {
+    let dataObject = {}
+    dataObject._id = req.body.courseId
+    dataObject.courseMaker = req.verifiedUserData.userId
 
+    // using zod for just taking the courseId and courseMakerId as a string 
+    let verifiedCourseIds = { courseMaker: dataObject.courseMaker }
+    try {
+        verifiedCourseIds._id = z.string().parse(dataObject._id)
+    } catch (err) {
+        return res.status(403).json({
+            "error": "ZOD",
+            "hint": "invalid data type",
+            "message": err,
+        })
+    }
+
+    // fetch-database call
+    try {
+        let deletedCourse = await CourseModel.findOneAndDelete(verifiedCourseIds)
+        res.json({
+            "success": "deleted course successfully",
+            "course deleted": deletedCourse.title,
+            "courseMaker": deletedCourse.courseMaker,
+        })
+    } catch (err) {
+        res.status(403).json({
+            "error": "database call",
+            "hint": "cannot delete course entry",
+            "message": err,
+        })
+    }
 })
 
 // if coursemaker, edit the course content of a course
-router.put('/course-content', courseMakerAuth, (req, res) => {
+router.put('/course-content', courseMakerAuth, async (req, res) => {
+    let dataObject = req.body // courseId, title, description, price, imageUrl
+    let courseId = dataObject.courseId // found courseId
+    delete dataObject.courseId // deleted courseId (title, description, price, imageUrl)
+    dataObject.courseMaker = req.verifiedUserData.userId // Added courseMaker (title, description, price, imageUrl, courseMaker)
 
+    // validating data with zod
+    let verifiedCourseData
+    try {
+        verifiedCourseData = zodValidation(dataObject)
+    } catch (err) {
+        return res.status(403).json({
+            "error": "ZOD",
+            "hint": "invalid data type",
+            "message": err,
+        })
+    }
+
+    // database fetch-call 
+    try {
+        await CourseModel.findOneAndUpdate({
+            "courseMaker": req.verifiedUserData.userId,
+            "_id": courseId,
+        }, dataObject)
+        res.json({
+            "success": "successfully updated course-content",
+            "updated details": dataObject
+        })
+    } catch (err) {
+        res.status(403).json({
+            "error": "database fetch-call",
+            "hint": "cannot update course-content in database",
+            "message": err,
+        })
+    }
 })
 
 module.exports = router
