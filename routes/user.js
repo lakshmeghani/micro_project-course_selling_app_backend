@@ -278,9 +278,17 @@ router.get('/purchases', userAuth, async (req, res) => {
     try {
         let allPurchasedCourses = []
         for (const courseObj of allPurchasesObj) {
-            allPurchasedCourses.push(
-                await CourseModel.findById(courseObj)
-            )
+            // adding a check for 
+            let validCourse = await CourseModel.findById(courseObj)
+            if (validCourse == null) {
+                validCourse = {
+                    _id: courseObj,
+                    data: "course was deleted by courseMaker",
+                    message: "no course data found"
+                }
+            }
+
+            allPurchasedCourses.push(validCourse)
         }
         res.json({
             "success": "found all purchased courses and course-details",
