@@ -148,7 +148,7 @@ router.put('/course-content', courseMakerAuth, async (req, res) => {
         res.status(403).json({
             "error": "database fetch-call",
             "hint": "cannot update course-content in database",
-            "message": (err.message || err),
+            "message": (typeof err === "string" ? err : err.message)
         })
     }
 })
