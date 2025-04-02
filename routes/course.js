@@ -134,10 +134,12 @@ router.put('/course-content', courseMakerAuth, async (req, res) => {
 
     // database fetch-call 
     try {
-        await CourseModel.findOneAndUpdate({
-            "courseMaker": req.verifiedUserData.userId,
-            "_id": courseId,
+        let courseJustUpdated = await CourseModel.findOneAndUpdate({
+            "courseMaker": req.verifiedUserData.userId, // course is of that particular courseMaker
+            "_id": courseId, // that particular course specified by the courseMaker
         }, dataObject)
+
+        if (courseJustUpdated == null) { throw new Error("you cannot change course content of other courseMakers") }
         res.json({
             "success": "successfully updated course-content",
             "updated details": dataObject
@@ -146,7 +148,7 @@ router.put('/course-content', courseMakerAuth, async (req, res) => {
         res.status(403).json({
             "error": "database fetch-call",
             "hint": "cannot update course-content in database",
-            "message": err,
+            "message": (err.message || err),
         })
     }
 })
